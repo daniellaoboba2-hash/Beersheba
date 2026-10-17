@@ -1,0 +1,15 @@
+{
+  "name": "beersheba",
+  "version": "1.0.0",
+  "description": "Beersheba — novel publishing platform (reader site + admin CMS)",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node lib/seed.js"
+  },
+  "dependencies": {}
+}

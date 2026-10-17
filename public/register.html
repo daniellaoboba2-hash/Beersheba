@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account — Beersheba</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/extra.css">
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="logo">👑&nbsp;BEERSHEBA</div>
+    <p class="auth-sub">Create your free account to continue.</p>
+    <div class="auth-error" id="err"></div>
+    <form id="registerForm">
+      <div class="field"><label>Name</label><input type="text" id="name" required autocomplete="name"></div>
+      <div class="field"><label>Email</label><input type="email" id="email" required autocomplete="email"></div>
+      <div class="field"><label>Password</label><input type="password" id="password" required minlength="8" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm Password</label><input type="password" id="confirmPassword" required minlength="8" autocomplete="new-password"></div>
+      <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--text-dim); margin-bottom:18px;">
+        <input type="checkbox" id="agreeTerms" required style="margin-top:3px;">
+        <span>I agree to the <a onclick="location.href='/terms.html'" style="color:var(--gold-bright); cursor:pointer;">Terms of Service</a> and <a onclick="location.href='/privacy.html'" style="color:var(--gold-bright); cursor:pointer;">Privacy Policy</a>.</span>
+      </label>
+      <button class="btn btn-gold btn-block" type="submit">Create Account</button>
+    </form>
+    <div class="auth-foot">Already have an account? <a onclick="location.href='/login.html'+location.search">Sign in</a></div>
+  </div>
+</div>
+<script src="/js/api.js"></script>
+<script src="/js/password-toggle.js"></script>
+<script>
+wirePasswordToggle('password');
+wirePasswordToggle('confirmPassword');
+document.getElementById('registerForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errBox = document.getElementById('err');
+  errBox.classList.remove('show');
+  if (document.getElementById('password').value !== document.getElementById('confirmPassword').value) {
+    errBox.textContent = 'Passwords do not match.';
+    errBox.classList.add('show');
+    return;
+  }
+  if (!document.getElementById('agreeTerms').checked) {
+    errBox.textContent = 'Please agree to the Terms of Service and Privacy Policy to continue.';
+    errBox.classList.add('show');
+    return;
+  }
+  try {
+    await API.post('/api/auth/register', {
+      name: document.getElementById('name').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('password').value,
+    });
+    const params = new URLSearchParams(location.search);
+    location.href = params.get('next') || '/';
+  } catch (err) {
+    errBox.textContent = err.message;
+    errBox.classList.add('show');
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,266 @@
+/* ============================================================
+   ADDITIONS ONLY — the approved Beersheba design above this file
+   (public/css/style.css) is untouched. Everything here is new
+   surface needed to make the design a real, connected product:
+   auth pages, purchase modal, VIP sales sections, misc small states.
+   ============================================================ */
+
+/* ---------- auth pages ---------- */
+.auth-shell{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 18px;}
+.auth-card{width:100%; max-width:400px; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:16px; padding:36px 30px;}
+.auth-card .logo{justify-content:center; margin-bottom:6px; font-size:20px;}
+.auth-sub{text-align:center; color:var(--text-faint); font-size:13px; margin-bottom:26px;}
+.field{margin-bottom:16px;}
+.field label{display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; font-weight:600;}
+.field input, .field select, .field textarea{width:100%; background:var(--bg-3); border:1px solid var(--border-soft); border-radius:9px; padding:12px 14px; color:var(--text); font-size:14px; font-family:inherit;}
+.field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--gold);}
+.pw-wrap{position:relative;}
+.pw-eye{position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--text-faint); padding:6px; display:flex; align-items:center; justify-content:center;}
+.pw-eye:hover{color:var(--gold-bright);}
+
+/* ---------- library card layout fix ----------
+   Bug: .lib-row .cov is 56px wide but coverHTML() also rendered a full
+   title+rating overlay meant for large grid cards, which had nowhere
+   legible to go at that width — that's the "cropped/squeezed" card. Fixed
+   at the JS layer by passing {title:false} for these thumbnails; the rules
+   below give the row itself room to breathe and make it wrap into a clean
+   stacked layout ([cover+info] then [button] on its own line) once the
+   viewport is too narrow for a single row to hold cover + text + button
+   without squeezing any of them. */
+.lib-row{flex-wrap:wrap;}
+.lib-row .cov{width:64px;}
+.lib-row .cov .cover{aspect-ratio:2/3;}
+.lib-row > .btn{flex-shrink:0;}
+@media (max-width:560px){
+  .lib-row{gap:12px;}
+  .lib-row .body{flex-basis:calc(100% - 76px); min-width:0;}
+  .lib-row > .btn{flex-basis:100%; width:100%; margin-top:2px; order:3; text-align:center;}
+}
+.lib-tabs{flex-wrap:nowrap;} /* already overflow-x:auto in the approved CSS — this just guarantees no wrapping fights the scroll */
+
+/* ---------- overflow risks found by CSS audit (no flex-wrap / no scroll
+   container on rows that can exceed narrow viewports) ---------- */
+.detail-actions{flex-wrap:wrap;}
+.footer-links{flex-wrap:wrap; justify-content:center;}
+@media (max-width:600px){
+  .tabs{overflow-x:auto; gap:20px; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tabs .tab{white-space:nowrap; flex-shrink:0;}
+  .reader-toolbar{overflow-x:auto; justify-content:flex-start; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .reader-toolbar::-webkit-scrollbar{display:none;}
+  .rt-btn{flex-shrink:0;}
+  .pricing-toggle{max-width:100%;}
+  .pricing-toggle button{padding:8px 14px; font-size:12px;}
+}
+@media (max-width:400px){
+  .pricing-toggle button{padding:7px 11px; font-size:11.5px;}
+}
+.auth-error{background:rgba(200,60,60,.12); border:1px solid rgba(200,60,60,.4); color:#ff9d9d; font-size:12.5px; padding:10px 14px; border-radius:8px; margin-bottom:16px; display:none;}
+.auth-error.show{display:block;}
+.auth-foot{text-align:center; margin-top:20px; font-size:13px; color:var(--text-faint);}
+.auth-foot a{color:var(--gold-bright); cursor:pointer; font-weight:600;}
+.btn-block{width:100%;}
+
+/* ---------- modal (purchase flow / choose-your-book) ---------- */
+.modal-scrim{position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(2px); z-index:120; display:none; align-items:center; justify-content:center; padding:20px;}
+.modal-scrim.show{display:flex;}
+.modal-box{width:100%; max-width:520px; max-height:86vh; overflow-y:auto; background:var(--bg-2); border:1px solid var(--border-2); border-radius:16px; padding:28px;}
+.modal-box h3{font-family:var(--serif); font-size:20px; margin-bottom:6px;}
+.modal-sub{color:var(--text-faint); font-size:13px; margin-bottom:20px;}
+.modal-close{float:right; cursor:pointer;}
+.choose-book-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:14px; margin-top:10px;}
+.choose-book-grid .card{cursor:pointer;}
+.pay-spinner{display:flex; flex-direction:column; align-items:center; gap:14px; padding:30px 0; text-align:center; color:var(--text-dim); font-size:13.5px;}
+.pay-spinner .dot{width:34px; height:34px; border-radius:999px; border:3px solid var(--border-2); border-top-color:var(--gold); animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.pay-success{text-align:center; padding:14px 0;}
+.pay-success .check{width:56px; height:56px; border-radius:999px; background:var(--success); color:#0a0a0a; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:26px;}
+.dev-badge{display:inline-block; background:rgba(207,159,69,.15); border:1px solid var(--gold-dim); color:var(--gold-bright); font-size:10.5px; font-weight:700; letter-spacing:.04em; padding:3px 9px; border-radius:999px; margin-bottom:14px;}
+
+/* ---------- VIP sales page ---------- */
+.vip-hero{background:linear-gradient(165deg,#1c1608,var(--bg-2) 55%); border:1px solid var(--border-2); border-radius:18px; padding:40px 30px; text-align:center; margin-top:24px;}
+.vip-hero h2{font-family:var(--serif); font-size:30px; margin-bottom:8px;}
+.vip-hero .price{font-family:var(--serif); font-size:44px; color:var(--gold-bright); margin:10px 0;}
+.vip-benefits{display:flex; flex-wrap:wrap; justify-content:center; gap:22px; margin:22px 0;}
+.vip-benefits .b{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim);}
+.vip-section{padding:30px 0 6px;}
+.vip-section h3{font-family:var(--serif); font-size:20px; margin-bottom:14px;}
+.testimonial-row{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:16px;}
+.testimonial{background:var(--bg-2); border:1px solid var(--border-soft); border-radius:12px; padding:18px;}
+.testimonial .stars{color:var(--gold); font-size:12px; margin-bottom:8px;}
+.testimonial p{font-size:13px; color:var(--text-dim); line-height:1.6;}
+.testimonial b{display:block; margin-top:10px; font-size:12.5px;}
+
+/* ---------- misc ---------- */
+.bm-btn{cursor:pointer;}
+.bm-btn.active svg{fill:var(--gold-bright); stroke:var(--gold-bright);}
+.locked-panel{text-align:center; padding:60px 24px; color:var(--text-dim);}
+.locked-panel .lock-icon{font-size:34px; margin-bottom:14px;}
+.inline-error{color:#ff9d9d; font-size:12.5px; margin-top:8px;}
+.small-muted{color:var(--text-faint); font-size:12px;}
+.comment-row{padding:16px 0; border-bottom:1px solid var(--border-soft);}
+.comment-row .who{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+.comment-row .who b{font-size:13.5px;}
+.comment-row .who span{font-size:11.5px; color:var(--text-faint);}
+.comment-row p{font-size:13.5px; color:var(--text-dim); line-height:1.55;}
+.comment-actions{display:flex; gap:16px; margin-top:8px; font-size:12px; color:var(--text-faint);}
+.comment-actions span{cursor:pointer;}
+.review-form{display:flex; flex-direction:column; gap:10px; margin-bottom:20px; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:10px; padding:16px;}
+.star-picker{display:flex; gap:4px; font-size:20px; cursor:pointer; color:var(--border-2);}
+.star-picker span.on{color:var(--gold);}
+/* ---------- chapter-end discussion ---------- */
+.chapter-discussion{max-width:680px; margin:36px auto 0; padding:24px 4px 8px; border-top:1px solid var(--border-soft);}
+.cd-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;}
+.cd-head h3{font-family:var(--serif); font-size:18px;}
+.cd-sub{color:var(--text-faint); font-size:13px; margin-bottom:16px;}
+
+/* ---------- user-select: none on non-editable UI only ---------- */
+button, .btn, .tab, .pill, .bn-item, .lib-tab, .chip, .card, nav a, .desktop-nav a,
+.rt-btn, .genre-pills .pill, .price-card, .drawer-head, .dch, .sort-row, .top .logo,
+.mobile-topbar .logo, .bm-btn, .icon-btn {
+  user-select: none;
+  -webkit-user-select: none;
+}
+input, textarea, select, .synopsis, .comment-row p, .review p, .policy-content, p.lead {
+  user-select: text;
+}
+button:focus-visible, .btn:focus-visible, a:focus-visible, .card:focus-visible, .tab:focus-visible {
+  outline: 2px solid var(--gold-bright); outline-offset: 2px;
+}
+
+/* ---------- policy / support / about pages ---------- */
+.policy-shell{max-width:760px; margin:0 auto; padding:50px 20px 80px;}
+.policy-shell h1{font-family:var(--serif); font-size:32px; margin-bottom:6px;}
+.policy-updated{color:var(--text-faint); font-size:12.5px; margin-bottom:28px;}
+.policy-content{font-size:14.5px; line-height:1.8; color:var(--text-dim); white-space:pre-line;}
+.faq-item{border-bottom:1px solid var(--border-soft); padding:16px 0;}
+.faq-item h4{font-size:14.5px; margin-bottom:6px;}
+.faq-item p{font-size:13.5px; color:var(--text-faint); line-height:1.6;}
+.contact-form .field{margin-bottom:14px;}
+.legal-links{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; color:var(--text-faint); margin-top:10px;}
+.legal-links a{cursor:pointer; text-decoration:underline;}
+
+/* ---------- responsive polish (does not change desktop layout) ---------- */
+@media (max-width: 480px){
+  .modal-box{max-width:94vw; padding:18px; max-height:88vh;}
+  .choose-book-grid{grid-template-columns:repeat(2,1fr);}
+  .chapter-discussion{padding-left:2px; padding-right:2px;}
+  .cd-head{flex-direction:column; align-items:flex-start; gap:2px;}
+  .testimonial-row{grid-template-columns:1fr;}
+  .vip-hero{padding:28px 16px;}
+}
+
+/* ---------- shared premium homepage system ---------- */
+.brand-mark{display:inline-flex; width:27px; height:23px; color:var(--gold-bright); flex-shrink:0;}
+.brand-mark svg{width:100%; height:100%;}
+.logo > span:last-child{display:flex; flex-direction:column;}
+.logo{letter-spacing:.08em; text-shadow:0 0 24px rgba(242,193,95,.12);}
+.logo small{letter-spacing:.11em;}
+
+body{background:
+  radial-gradient(circle at 70% -10%, rgba(27,44,58,.42), transparent 34rem),
+  linear-gradient(180deg,#05070a 0%,#070b10 48%,#05070a 100%);}
+header.top,.mobile-topbar{background:rgba(5,7,10,.82); border-color:rgba(197,214,226,.12);}
+.top-inner{padding-top:14px; padding-bottom:14px;}
+.desktop-nav .links{gap:28px; font-size:12px; letter-spacing:.015em;}
+.nav-right{gap:10px;}
+.icon-btn{background:rgba(19,27,36,.76);}
+
+.hero{padding:70px 0 58px; overflow:hidden;}
+.hero::before{content:''; position:absolute; width:620px; height:620px; right:-210px; top:-160px; border-radius:50%; background:radial-gradient(circle,rgba(210,145,39,.13),transparent 66%); pointer-events:none;}
+.hero-grid{grid-template-columns:minmax(0,.92fr) minmax(520px,1.08fr); gap:72px; position:relative;}
+.hero h1{font-size:clamp(44px,5vw,70px); letter-spacing:-.035em; line-height:1.02; max-width:620px;}
+.hero h1 .gold-txt{color:#f5c466; text-shadow:0 10px 36px rgba(211,154,47,.18);}
+.hero p.lead{max-width:480px; font-size:15px; color:#aeb4b8; line-height:1.8;}
+.hero .cta-row{margin-top:32px;}
+.hero .btn{border-radius:7px; padding:13px 22px;}
+.hero-stats{gap:0; margin-top:54px;}
+.stat{padding-right:28px; margin-right:28px; border-right:1px solid rgba(197,214,226,.14);}
+.stat:last-child{border-right:0; margin-right:0;}
+.stat b{font-size:24px;}
+.stat span{font-size:10px; letter-spacing:.1em;}
+.hero-visual{gap:0; align-items:stretch; min-height:390px;}
+.hero-cover-wrap{width:276px; margin:0; z-index:2; filter:drop-shadow(24px 24px 30px rgba(0,0,0,.35));}
+.hero-cover-wrap .cover{border-radius:5px; border-color:rgba(240,198,110,.28); box-shadow:0 28px 55px -22px rgba(0,0,0,.95);}
+.featured-panel{align-self:center; margin-left:-1px; padding:34px 30px 34px 42px; min-height:300px; display:flex; flex-direction:column; justify-content:center; border-radius:0 9px 9px 0; background:linear-gradient(135deg,rgba(20,29,38,.94),rgba(10,15,21,.86)); border-left:0; border-color:rgba(240,198,110,.18); box-shadow:18px 22px 55px -28px rgba(0,0,0,.8);}
+.featured-panel .eyebrow{font-size:10px; margin-bottom:12px;}
+.featured-panel h3{font-size:28px; line-height:1.14;}
+.featured-panel p{font-size:13px; line-height:1.7;}
+.featured-meta{padding-top:15px; border-top:1px solid rgba(197,214,226,.12); font-size:12px;}
+
+.trust-bar{background:rgba(13,19,26,.5); border-color:rgba(197,214,226,.1); padding:25px 0;}
+.trust-grid{gap:0;}
+.trust-item{padding:0 22px; min-height:42px; border-right:1px solid rgba(197,214,226,.1);}
+.trust-item:first-child{padding-left:0;}
+.trust-item:last-child{border-right:0; padding-right:0;}
+.trust-item b{font-size:12px;}
+.trust-item span{display:block; margin-top:3px; line-height:1.4;}
+
+section.block{padding:48px 0 12px;}
+.block-head{margin-bottom:20px; align-items:center;}
+.section-title{font-size:25px; letter-spacing:-.02em;}
+.section-kicker{display:block; color:var(--gold); font-family:var(--sans); font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; margin-bottom:6px;}
+.view-all{font-size:11px; letter-spacing:.08em; text-transform:uppercase;}
+.rail{gap:16px; padding:4px 2px 22px;}
+.rail .card{width:166px;}
+.card .cover{border-radius:5px; background-color:var(--bg-2);}
+.card-meta{font-size:11px; letter-spacing:.01em;}
+.cover-title{padding:28px 11px 11px;}
+.cover-title h4{font-size:13px;}
+.cover-badges{top:9px; left:9px; right:9px;}
+.badge{border-radius:4px; font-size:9px; padding:4px 7px;}
+
+@media (max-width:1100px){
+  .hero-grid{grid-template-columns:1fr .95fr; gap:34px;}
+  .hero-cover-wrap{width:220px;}
+  .featured-panel{padding-left:28px;}
+  .trust-item{padding-left:14px; padding-right:14px;}
+}
+@media (max-width:860px){
+  body{padding-bottom:78px;}
+  .mobile-topbar{padding:13px 18px;}
+  .mobile-topbar .logo{font-size:16px;}
+  .mobile-topbar .brand-mark{width:23px; height:19px;}
+  .hero{padding:34px 0 30px;}
+  .hero::before{width:400px; height:400px; right:-220px; top:90px;}
+  .hero-grid{display:block;}
+  .hero h1{font-size:39px; max-width:390px;}
+  .hero p.lead{font-size:14px; line-height:1.7; max-width:380px;}
+  .hero .cta-row{gap:9px; margin-top:24px;}
+  .hero .btn{padding:11px 16px; font-size:12px;}
+  .hero-stats{margin-top:34px; justify-content:space-between; gap:0;}
+  .stat{padding-right:12px; margin-right:12px;}
+  .stat b{font-size:19px;}
+  .stat span{font-size:8px;}
+  .hero-visual{margin-top:38px; min-height:0; flex-direction:row; align-items:stretch;}
+  .hero-cover-wrap{width:47%; max-width:190px; margin:0;}
+  .featured-panel{padding:20px 16px 18px 19px; min-height:0; border-radius:0 7px 7px 0;}
+  .featured-panel h3{font-size:19px;}
+  .featured-panel p{font-size:11px; line-height:1.5;}
+  .featured-meta{display:block; font-size:10px; line-height:1.8; padding-top:9px;}
+  .featured-panel .btn{font-size:10px; padding:9px 10px;}
+  .trust-bar{padding:22px 0;}
+  .trust-grid{grid-template-columns:repeat(2,1fr); gap:18px 0;}
+  .trust-item{padding:0 12px; border-right:0;}
+  .trust-item:nth-child(odd){padding-left:0; border-right:1px solid rgba(197,214,226,.1);}
+  .trust-item:nth-child(even){padding-right:0;}
+  .trust-item b{font-size:11px;}
+  .trust-item span{font-size:10px;}
+  section.block{padding:36px 0 8px;}
+  .section-title{font-size:21px;}
+  .section-kicker{font-size:9px; margin-bottom:4px;}
+  .rail{gap:12px; margin-right:-18px; padding-right:18px;}
+  .rail .card{width:140px;}
+  .card-meta{font-size:10px;}
+}
+@media (max-width:420px){
+  .hero h1{font-size:35px;}
+  .hero-visual{gap:0;}
+  .featured-panel{padding-left:14px;}
+  .featured-panel h3{font-size:17px;}
+  .featured-panel .cta-row{gap:5px;}
+  .featured-panel .btn{padding:8px 7px; font-size:9px;}
+  .hero-stats .stat{padding-right:8px; margin-right:8px;}
+  .hero-stats .stat b{font-size:17px;}
+  .hero-stats .stat span{font-size:7px;}
+}

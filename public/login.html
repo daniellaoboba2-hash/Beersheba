@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In — Beersheba</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/extra.css">
+</head>
+<body>
+<div class="auth-shell">
+  <div class="auth-card">
+    <div class="logo">👑&nbsp;BEERSHEBA</div>
+    <p class="auth-sub">Sign in to continue your story.</p>
+    <div class="auth-error" id="err"></div>
+    <form id="loginForm">
+      <div class="field"><label>Email</label><input type="email" id="email" required autocomplete="email"></div>
+      <div class="field"><label>Password</label><input type="password" id="password" required autocomplete="current-password"></div>
+      <button class="btn btn-gold btn-block" type="submit">Sign In</button>
+    </form>
+    <div class="auth-foot">
+      <a onclick="location.href='/forgot-password.html'">Forgot password?</a><br><br>
+      New to Beersheba? <a onclick="location.href='/register.html'+location.search">Create an account</a>
+    </div>
+  </div>
+</div>
+<script src="/js/api.js"></script>
+<script src="/js/password-toggle.js"></script>
+<script>
+wirePasswordToggle('password');
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const errBox = document.getElementById('err');
+  errBox.classList.remove('show');
+  try {
+    await API.post('/api/auth/login', {
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('password').value,
+    });
+    const params = new URLSearchParams(location.search);
+    location.href = params.get('next') || '/';
+  } catch (err) {
+    errBox.textContent = err.message;
+    errBox.classList.add('show');
+  }
+});
+</script>
+</body>
+</html>

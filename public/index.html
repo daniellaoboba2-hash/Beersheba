@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beersheba — Stories that stay with you.</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/extra.css">
+</head>
+<body>
+
+<!-- ================= DESKTOP HEADER ================= -->
+<header class="top">
+  <div class="top-inner">
+    <div class="logo"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 26" fill="none"><path d="m3 5 5 4 8-7 8 7 5-4-2 14H5L3 5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 19h18M11 23h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="3" r="1.5" fill="currentColor"/></svg></span><span>BEERSHEBA<small>Stories that stay with you.</small></span></div>
+    <nav class="desktop-nav">
+      <div class="links">
+        <a data-nav="home" class="active" onclick="go('home')">Discover</a>
+        <a data-nav="discover" onclick="go('discover')">Genres</a>
+        <a data-nav="discover" onclick="go('discover')">New Releases</a>
+        <a data-nav="discover" onclick="go('discover')">Trending</a>
+        <a data-nav="pricing" onclick="go('pricing')">VIP</a>
+      </div>
+    </nav>
+    <div class="nav-right">
+      <button class="icon-btn" onclick="openSearch()" aria-label="Search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn" onclick="go('library')" aria-label="Library">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </button>
+      <div class="avatar" id="navAvatar" onclick="go('profile')" style="cursor:pointer">?</div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= MOBILE TOPBAR ================= -->
+<div class="mobile-topbar">
+  <div class="logo"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 26" fill="none"><path d="m3 5 5 4 8-7 8 7 5-4-2 14H5L3 5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M7 19h18M11 23h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="3" r="1.5" fill="currentColor"/></svg></span><span>BEERSHEBA</span></div>
+  <button class="icon-btn" onclick="openSearch()" aria-label="Search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+  </button>
+</div>
+
+<main id="app"></main>
+
+<!-- ================= BOTTOM NAV (mobile) ================= -->
+<nav class="bottom-nav">
+  <div class="row">
+    <button class="bn-item active" data-bn="home" onclick="go('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      Home
+    </button>
+    <button class="bn-item" data-bn="discover" onclick="go('discover')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m14.5 9.5-2 5-5 2 2-5z"/></svg>
+      Discover
+    </button>
+    <button class="bn-item" data-bn="library" onclick="go('library')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Library
+    </button>
+    <button class="bn-item" data-bn="search" onclick="openSearch()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      Search
+    </button>
+    <button class="bn-item" data-bn="profile" onclick="go('profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
+      Account
+    </button>
+  </div>
+</nav>
+
+<!-- ================= SEARCH OVERLAY ================= -->
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-top">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-faint)"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input class="search-input" id="searchInput" placeholder="Search stories, authors, genres…" oninput="renderSearch()">
+    <button class="icon-btn" onclick="closeSearch()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="search-results" id="searchResults"></div>
+</div>
+
+<!-- ================= CONTENTS DRAWER ================= -->
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h3>Contents</h3>
+    <button class="icon-btn" onclick="closeDrawer()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+  <div class="drawer-foot"><button class="btn btn-gold" style="width:100%" onclick="closeDrawer()">Jump to Chapter</button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/password-toggle.js"></script>
+<script src="/js/voice.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
