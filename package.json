@@ -11,5 +11,7 @@
     "start": "node server.js",
     "seed": "node lib/seed.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
 }
