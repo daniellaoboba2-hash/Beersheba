@@ -351,22 +351,94 @@ function register(router) {
   // ------------------------------------------------------------- products
   router.get('/api/admin/products', async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    sendJSON(res, 200, db.prepare('SELECT * FROM products ORDER BY price_cents').all());
+    sendJSON(res, 200, db.prepare('SELECT * FROM products ORDER BY display_order, price_cents').all());
   });
+
+  router.post('/api/admin/products', async (req, res, params, body) => {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    if (!body.name || !body.priceCents || body.priceCents <= 0) {
+      return badRequest(res, 'A name and a positive price are required.');
+    }
+    if (!['READING_PASS', 'VIP_MEMBERSHIP'].includes(body.type)) {
+      return badRequest(res, 'Unknown product type.');
+    }
+    if (body.type === 'READING_PASS' && (!body.chapterAllowance || body.chapterAllowance <= 0)) {
+      return badRequest(res, 'Reading passes require a positive chapter allowance.');
+    }
+    const pid = id();
+    db.prepare(
+      `INSERT INTO products (id, name, description, price_cents, currency, type, chapter_allowance, display_order, badge, active)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`
+    ).run(
+      pid, body.name, body.description || null, body.priceCents, body.currency || 'USD', body.type,
+      body.type === 'READING_PASS' ? body.chapterAllowance : null,
+      body.displayOrder || 0, body.badge || null, body.active === false ? 0 : 1
+    );
+    db.prepare(
+      `INSERT INTO product_price_history (id, product_id, price_cents, currency, changed_by) VALUES (?,?,?,?,?)`
+    ).run(id(), pid, body.priceCents, body.currency || 'USD', admin.id);
+    logAction(admin.id, 'PRODUCT_CREATED', 'product', pid, { name: body.name, type: body.type });
+    sendJSON(res, 201, db.prepare('SELECT * FROM products WHERE id = ?').get(pid));
+  });
+
+  router.get('/api/admin/products/:id/price-history', async (req, res, { id: pid }) => {
+    if (!requireAdmin(req, res)) return;
+    sendJSON(res, 200, db.prepare('SELECT * FROM product_price_history WHERE product_id = ? ORDER BY changed_at DESC').all(pid));
+  });
+
   router.patch('/api/admin/products/:id', async (req, res, { id: pid }, body) => {
     const admin = requireAdmin(req, res);
     if (!admin) return;
+    const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(pid);
+    if (!existing) return notFound(res, 'Product not found.');
+    if (body.priceCents !== undefined && body.priceCents <= 0) return badRequest(res, 'Price must be positive.');
+    if (body.chapterAllowance !== undefined && existing.type === 'READING_PASS' && body.chapterAllowance !== null && body.chapterAllowance <= 0) {
+      return badRequest(res, 'Chapter allowance must be positive.');
+    }
+
     const sets = ["updated_at = datetime('now')"];
     const args = [];
     if (body.name !== undefined) { sets.push('name = ?'); args.push(body.name); }
     if (body.description !== undefined) { sets.push('description = ?'); args.push(body.description); }
-    if (body.priceCents !== undefined) { sets.push('price_cents = ?'); args.push(body.priceCents); }
     if (body.currency !== undefined) { sets.push('currency = ?'); args.push(body.currency); }
     if (body.active !== undefined) { sets.push('active = ?'); args.push(body.active ? 1 : 0); }
+    if (body.chapterAllowance !== undefined) { sets.push('chapter_allowance = ?'); args.push(body.chapterAllowance); }
+    if (body.displayOrder !== undefined) { sets.push('display_order = ?'); args.push(body.displayOrder); }
+    if (body.badge !== undefined) { sets.push('badge = ?'); args.push(body.badge); }
+
+    // Historical orders always keep the price actually paid — changing the
+    // product's current price never touches rows already in `orders`.
+    // We only record the NEW price going forward, in price_history, so an
+    // admin (or this UI) can see what it used to cost and when it changed.
+    if (body.priceCents !== undefined && body.priceCents !== existing.price_cents) {
+      sets.push('price_cents = ?');
+      args.push(body.priceCents);
+      db.prepare(
+        `INSERT INTO product_price_history (id, product_id, price_cents, currency, changed_by) VALUES (?,?,?,?,?)`
+      ).run(id(), pid, body.priceCents, body.currency || existing.currency, admin.id);
+    }
+
     args.push(pid);
     db.prepare(`UPDATE products SET ${sets.join(', ')} WHERE id = ?`).run(...args);
-    logAction(admin.id, 'PRICE_CHANGED', 'product', pid, body);
+    logAction(admin.id, 'PRICE_CHANGED', 'product', pid, { old: existing.price_cents, new: body.priceCents });
     sendJSON(res, 200, db.prepare('SELECT * FROM products WHERE id = ?').get(pid));
+  });
+
+  // Book <-> reading-pass eligibility (admin-controlled, not inferred from chapter count)
+  router.get('/api/admin/books/:id/product-access', async (req, res, { id: bookId }) => {
+    if (!requireAdmin(req, res)) return;
+    sendJSON(res, 200, db.prepare('SELECT product_id FROM book_product_access WHERE book_id = ?').all(bookId).map(r=>r.product_id));
+  });
+  router.patch('/api/admin/books/:id/product-access', async (req, res, { id: bookId }, body) => {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    db.prepare('DELETE FROM book_product_access WHERE book_id = ?').run(bookId);
+    (body.productIds || []).forEach((pid) => {
+      db.prepare('INSERT OR IGNORE INTO book_product_access (book_id, product_id) VALUES (?,?)').run(bookId, pid);
+    });
+    logAction(admin.id, 'BOOK_PRODUCT_ACCESS_CHANGED', 'book', bookId, { productIds: body.productIds || [] });
+    sendJSON(res, 200, { ok: true });
   });
 
   // --------------------------------------------------------------- orders
@@ -404,12 +476,12 @@ function register(router) {
   router.post('/api/admin/entitlements/grant', async (req, res, params, body) => {
     const admin = requireAdmin(req, res);
     if (!admin) return;
-    if (!body.userId || !body.type) return badRequest(res, 'userId and type are required.');
-    const product = db.prepare('SELECT * FROM products WHERE type = ?').get(body.type);
-    if (!product) return badRequest(res, 'Unknown entitlement type.');
+    if (!body.userId || !body.productId) return badRequest(res, 'userId and productId are required.');
+    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(body.productId);
+    if (!product) return badRequest(res, 'Unknown product.');
     const access = require('../lib/access');
-    const entId = access.grantEntitlement(body.userId, null, product.id, body.type);
-    logAction(admin.id, 'ENTITLEMENT_GRANTED', 'entitlement', entId, { userId: body.userId, type: body.type });
+    const entId = access.grantEntitlement(body.userId, null, product.id, product.type);
+    logAction(admin.id, 'ENTITLEMENT_GRANTED', 'entitlement', entId, { userId: body.userId, productId: product.id });
     sendJSON(res, 201, db.prepare('SELECT * FROM entitlements WHERE id = ?').get(entId));
   });
 

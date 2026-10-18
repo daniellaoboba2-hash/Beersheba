@@ -16,6 +16,12 @@ function register(router) {
     const product = db.prepare('SELECT * FROM products WHERE id = ? AND active = 1').get(body.productId);
     if (!product) return notFound(res, 'Product not found or inactive.');
 
+    // Lifetime VIP is a one-time membership — block a second purchase at
+    // order-creation time (server-side), not just by hiding the button.
+    if (product.type === 'VIP_MEMBERSHIP' && access.isVip(user.id)) {
+      return badRequest(res, "You're already a Lifetime VIP member — no need to purchase again.");
+    }
+
     const orderId = id();
     const reference = `BSH-${orderId.slice(0, 8)}-${Date.now()}`;
     db.prepare(
@@ -82,7 +88,7 @@ function register(router) {
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(order.product_id);
 
     let entitlementId = null;
-    if (product.type === 'LIFETIME_VIP') {
+    if (product.type === 'VIP_MEMBERSHIP') {
       access.grantVip(user.id, order.id, order.provider_reference);
     } else {
       entitlementId = access.grantEntitlement(user.id, order.id, product.id, product.type);
@@ -113,11 +119,13 @@ function register(router) {
     if (!user) return;
     const ent = db.prepare('SELECT * FROM entitlements WHERE id = ? AND user_id = ?').get(entId, user.id);
     if (!ent) return notFound(res, 'Entitlement not found.');
-    const tierMap = { CHAPTER_ACCESS_20: '20', CHAPTER_ACCESS_30: '30', CHAPTER_ACCESS_50: '50' };
-    const tier = tierMap[ent.type];
     const books = db
-      .prepare(`SELECT * FROM books WHERE status='PUBLISHED' AND access_tiers LIKE ?`)
-      .all(`%"${tier}"%`);
+      .prepare(
+        `SELECT b.* FROM books b
+         JOIN book_product_access bpa ON bpa.book_id = b.id
+         WHERE b.status='PUBLISHED' AND bpa.product_id = ?`
+      )
+      .all(ent.product_id);
     sendJSON(res, 200, { entitlement: ent, books: books.map((b) => ({ id: b.id, slug: b.slug, title: b.title, cover: b.cover_image, author: b.author })) });
   });
 }

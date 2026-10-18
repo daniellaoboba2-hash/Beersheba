@@ -25,7 +25,14 @@ function register(router) {
     if (!user) return;
     const vip = access.isVip(user.id);
     const entitlements = db.prepare('SELECT * FROM entitlements WHERE user_id = ? ORDER BY created_at DESC').all(user.id);
-    sendJSON(res, 200, { user: publicUser(user), vip, entitlements });
+    const googleIdentity = db.prepare(`SELECT provider_email FROM external_identities WHERE user_id = ? AND provider = 'google'`).get(user.id);
+    sendJSON(res, 200, {
+      user: publicUser(user),
+      vip,
+      entitlements,
+      googleConnected: !!googleIdentity,
+      googleEmail: googleIdentity ? googleIdentity.provider_email : null,
+    });
   });
 
   router.patch('/api/me/settings', async (req, res, params, body) => {
@@ -111,11 +118,15 @@ function register(router) {
     const user = requireAuth(req, res);
     if (!user) return;
     const { currentPassword, newPassword } = body;
-    if (!currentPassword || !verifyPassword(currentPassword, user.password_hash)) {
-      return badRequest(res, 'Current password is incorrect.');
+    // Google-only accounts (has_password=0) have no real password to check
+    // against yet — this call is "set your first password", not "change".
+    if (user.has_password) {
+      if (!currentPassword || !verifyPassword(currentPassword, user.password_hash)) {
+        return badRequest(res, 'Current password is incorrect.');
+      }
     }
     if (!newPassword || newPassword.length < 8) return badRequest(res, 'New password must be at least 8 characters.');
-    db.prepare("UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?").run(hashPassword(newPassword), user.id);
+    db.prepare("UPDATE users SET password_hash = ?, has_password = 1, updated_at = datetime('now') WHERE id = ?").run(hashPassword(newPassword), user.id);
     // Sign the reader out everywhere else for safety, but keep the session
     // that just made this change (identified by the caller's own cookie —
     // simplest correct approach here is to drop every OTHER session).
@@ -231,7 +242,7 @@ function register(router) {
 
     const items = db
       .prepare(
-        `SELECT li.*, b.title, b.author, b.cover_image, b.slug FROM library_items li
+        `SELECT li.*, b.title, b.author, b.cover_image, b.slug, b.pdf_enabled, b.pdf_url FROM library_items li
          JOIN books b ON b.id = li.book_id WHERE li.user_id = ? ORDER BY li.added_at DESC`
       )
       .all(user.id);
@@ -243,6 +254,8 @@ function register(router) {
     const enriched = items.map((it) => {
       const totalChapters = db.prepare(`SELECT COUNT(*) c FROM chapters WHERE book_id=? AND status='PUBLISHED'`).get(it.book_id).c;
       const progress = progressByBook[it.book_id];
+      const book = db.prepare('SELECT * FROM books WHERE id = ?').get(it.book_id);
+      const pdfGate = access.canDownloadPdf(user.id, book);
       return {
         bookId: it.book_id,
         slug: it.slug,
@@ -255,6 +268,7 @@ function register(router) {
         percent: progress ? progress.percent : 0,
         started: !!progress,
         completed: progress ? progress.percent >= 100 : false,
+        canDownloadPdf: pdfGate.allowed,
       };
     });
 

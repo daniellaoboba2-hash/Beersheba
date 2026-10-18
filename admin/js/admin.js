@@ -187,7 +187,7 @@ async function openBookEditor(bookId){
     <div id="bookTabBody"></div>`;
   const body = document.getElementById('bookTabBody');
   if (adminState.bookTab === 'chapters') return renderChapterManager(book);
-  if (adminState.bookTab === 'access') return renderAccessTab(book, body);
+  if (adminState.bookTab === 'access') return await renderAccessTab(book, body);
   if (adminState.bookTab === 'seo') return renderSeoTab(book, body);
   return renderDetailsTab(book, body);
 }
@@ -324,13 +324,19 @@ async function saveBookDetails(bookId){
   } catch (e) { toast(e.message); }
 }
 
-function renderAccessTab(book, body){
-  const tiers = book.accessTiers || [];
+async function renderAccessTab(book, body){
   const pdfSizeKB = book.pdf_size_bytes ? (book.pdf_size_bytes/1024).toFixed(0)+' KB' : '';
+  const [readingPasses, assignedProductIds] = await Promise.all([
+    API.get('/api/admin/products').then(p=>p.filter(x=>x.type==='READING_PASS')),
+    API.get(`/api/admin/books/${book.id}/product-access`),
+  ]);
   body.innerHTML = `
     <div class="panel">
-      <div class="field"><label>Chapter-Access Eligibility</label>
-        ${['20','30','50'].map(t=>`<label class="checkbox-row"><input type="checkbox" class="tierBox" value="${t}" ${tiers.includes(t)?'checked':''}> ${t} Chapters Access</label>`).join('')}
+      <div class="field"><label>Required Reading Pass(es)</label>
+        <select id="fProductAccess" multiple size="${Math.min(6, Math.max(3, readingPasses.length))}">
+          ${readingPasses.map(p=>`<option value="${p.id}" ${assignedProductIds.includes(p.id)?'selected':''}>${esc(p.name)} — ${p.chapter_allowance||'?'} chapters — $${(p.price_cents/100).toFixed(2)}</option>`).join('') || '<option disabled>No reading passes created yet — add one in Settings → Products &amp; Pricing</option>'}
+        </select>
+        <p class="small-muted" style="margin-top:6px;">Ctrl/Cmd-click to select multiple. A reader who buys any of these passes can choose this book.</p>
       </div>
       <label class="checkbox-row"><input type="checkbox" id="fVipEligible" ${book.vip_eligible?'checked':''}> VIP Eligible (readable by VIP members)</label>
       <label class="checkbox-row"><input type="checkbox" id="fVipExclusive" ${book.vip_exclusive?'checked':''}> VIP Exclusive (VIP-only, no standard purchase)</label>
@@ -432,10 +438,10 @@ async function savePdfAccessFlags(bookId){
   } catch (e) { toast(e.message); }
 }
 async function saveBookAccess(bookId){
-  const tiers = Array.from(document.querySelectorAll('.tierBox')).filter(c=>c.checked).map(c=>c.value);
+  const productIds = Array.from(document.getElementById('fProductAccess').selectedOptions).map(o=>o.value);
   try {
+    await API.patch(`/api/admin/books/${bookId}/product-access`, { productIds });
     await API.patch(`/api/admin/books/${bookId}`, {
-      accessTiers: tiers,
       vipEligible: document.getElementById('fVipEligible').checked,
       vipExclusive: document.getElementById('fVipExclusive').checked,
       freePreviewChapters: Number(document.getElementById('fPreview').value) || 0,
@@ -700,12 +706,12 @@ async function viewReader(readerId){
 }
 async function suspendReader(id){ if(!confirm('Suspend this reader?'))return; await API.post(`/api/admin/readers/${id}/suspend`,{}); toast('Suspended'); viewReader(id); }
 async function restoreReader(id){ await API.post(`/api/admin/readers/${id}/restore`,{}); toast('Restored'); viewReader(id); }
-function grantEntitlementModal(readerId){
+async function grantEntitlementModal(readerId){
+  const products = await API.get('/api/admin/products');
+  const readingPasses = products.filter(p=>p.type==='READING_PASS');
   openModal(`<h3 style="font-family:var(--serif)">Grant Entitlement</h3>
-    <div class="field"><label>Type</label><select id="grantType">
-      <option value="CHAPTER_ACCESS_20">20 Chapters Access</option>
-      <option value="CHAPTER_ACCESS_30">30 Chapters Access</option>
-      <option value="CHAPTER_ACCESS_50">50 Chapters Access</option>
+    <div class="field"><label>Reading Pass Product</label><select id="grantProductId">
+      ${readingPasses.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.chapter_allowance||'?'} chapters — $${(p.price_cents/100).toFixed(2)})</option>`).join('')}
     </select></div>
     <div style="display:flex; gap:8px; justify-content:flex-end;">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -714,7 +720,7 @@ function grantEntitlementModal(readerId){
 }
 async function grantEntitlement(readerId){
   try {
-    await API.post('/api/admin/entitlements/grant', { userId: readerId, type: document.getElementById('grantType').value });
+    await API.post('/api/admin/entitlements/grant', { userId: readerId, productId: document.getElementById('grantProductId').value });
     closeModal(); toast('Entitlement granted'); viewReader(readerId);
   } catch (e) { toast(e.message); }
 }
@@ -836,15 +842,27 @@ async function renderSettings(){
   main.innerHTML = `
     <div class="admin-topbar"><h1>Settings</h1></div>
     <div class="panel">
-      <h3>Products & Pricing</h3>
-      <table><thead><tr><th>Name</th><th>Price (cents)</th><th>Currency</th><th>Active</th><th></th></tr></thead>
-      <tbody>${products.map(p=>`<tr>
+      <h3>Products &amp; Pricing</h3>
+      <p class="small-muted" style="margin-bottom:14px;">Prices, chapter allowances, and product names are fully admin-controlled — nothing here requires touching code. Historical orders always keep the price paid at the time, even after you change a product's price later.</p>
+      <h4 style="font-size:13px; margin-bottom:8px;">Reading Passes</h4>
+      <table><thead><tr><th>Name</th><th>Chapters</th><th>Price</th><th>Status</th><th></th></tr></thead>
+      <tbody>${products.filter(p=>p.type==='READING_PASS').sort((a,b)=>a.display_order-b.display_order).map(p=>`<tr>
+        <td>${esc(p.name)} ${p.badge?`<span class="badge badge-published">${esc(p.badge)}</span>`:''}</td>
+        <td>${p.chapter_allowance||'—'}</td>
+        <td>$${(p.price_cents/100).toFixed(2)} ${p.currency}</td>
+        <td>${badge(p.active?'ACTIVE':'INACTIVE')}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="openProductEditor('${p.id}')">Edit</button></td>
+      </tr>`).join('') || '<tr><td colspan="5" class="small-muted">No reading passes yet.</td></tr>'}</tbody></table>
+      <button class="btn btn-gold btn-sm" style="margin-top:12px;" onclick="openProductEditor(null,'READING_PASS')">+ Create Reading Pass</button>
+
+      <h4 style="font-size:13px; margin:22px 0 8px;">Memberships</h4>
+      <table><thead><tr><th>Name</th><th>Price</th><th>Status</th><th></th></tr></thead>
+      <tbody>${products.filter(p=>p.type==='VIP_MEMBERSHIP').map(p=>`<tr>
         <td>${esc(p.name)}</td>
-        <td><input type="number" id="price-${p.id}" value="${p.price_cents}" style="width:100px; background:var(--bg-2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:5px 8px;"></td>
-        <td>${p.currency}</td>
-        <td><input type="checkbox" id="active-${p.id}" ${p.active?'checked':''}></td>
-        <td><button class="btn btn-ghost btn-sm" onclick="saveProduct('${p.id}')">Save</button></td>
-      </tr>`).join('')}</tbody></table>
+        <td>$${(p.price_cents/100).toFixed(2)} ${p.currency}</td>
+        <td>${badge(p.active?'ACTIVE':'INACTIVE')}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="openProductEditor('${p.id}')">Edit</button></td>
+      </tr>`).join('') || '<tr><td colspan="4" class="small-muted">No VIP membership product yet.</td></tr>'}</tbody></table>
     </div>
     <div class="panel">
       <h3>Genres</h3>
@@ -912,10 +930,60 @@ async function closeSupportMessage(id){
   await API.post(`/api/admin/support-messages/${id}/close`, {});
   renderSettings();
 }
-async function saveProduct(id){
+async function openProductEditor(productId, defaultType){
+  let p = { id: null, name: '', description: '', price_cents: 100, currency: 'USD', type: defaultType || 'READING_PASS', chapter_allowance: '', display_order: 0, badge: '', active: true };
+  let history = [];
+  if (productId) {
+    const products = await API.get('/api/admin/products');
+    p = products.find(x=>x.id===productId);
+    history = await API.get(`/api/admin/products/${productId}/price-history`).catch(()=>[]);
+  }
+  openModal(`
+    <h3 style="font-family:var(--serif)">${productId ? 'Edit Product' : 'New Product'}</h3>
+    <div class="field"><label>Name</label><input id="pfName" value="${esc(p.name)}" placeholder="e.g. 100 Chapters Access"></div>
+    <div class="field"><label>Description</label><textarea id="pfDesc" rows="2">${esc(p.description||'')}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Price (USD)</label><input type="number" step="0.01" id="pfPrice" value="${(p.price_cents/100).toFixed(2)}"></div>
+      ${p.type==='READING_PASS' ? `<div class="field"><label>Chapter Allowance</label><input type="number" id="pfChapters" value="${p.chapter_allowance||''}"></div>` : ''}
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Display Order</label><input type="number" id="pfOrder" value="${p.display_order||0}"></div>
+      <div class="field"><label>Badge (optional)</label><input id="pfBadge" value="${esc(p.badge||'')}" placeholder="e.g. Most Popular"></div>
+    </div>
+    <label class="checkbox-row"><input type="checkbox" id="pfActive" ${p.active?'checked':''}> Active (visible for new purchases)</label>
+    ${history.length ? `<div class="small-muted" style="margin-top:10px;"><b>Price history:</b><br>${history.map(h=>`$${(h.price_cents/100).toFixed(2)} — ${fmtDate(h.changed_at)}`).join('<br>')}</div>` : ''}
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveProductFields(${productId ? `'${productId}'` : 'null'}, '${p.type}')">Save</button>
+    </div>`);
+}
+async function saveProductFields(productId, type){
+  const priceCents = Math.round(Number(document.getElementById('pfPrice').value) * 100);
+  if (!priceCents || priceCents <= 0) return toast('Price must be a positive amount.');
+  const name = document.getElementById('pfName').value.trim();
+  if (!name) return toast('Name is required.');
+  const chapterField = document.getElementById('pfChapters');
+  const chapterAllowance = chapterField ? Number(chapterField.value) : null;
+  if (type === 'READING_PASS' && (!chapterAllowance || chapterAllowance <= 0)) return toast('Chapter allowance must be a positive number.');
+  const payload = {
+    name,
+    description: document.getElementById('pfDesc').value.trim(),
+    priceCents,
+    currency: 'USD',
+    displayOrder: Number(document.getElementById('pfOrder').value) || 0,
+    badge: document.getElementById('pfBadge').value.trim() || null,
+    active: document.getElementById('pfActive').checked,
+    chapterAllowance: type === 'READING_PASS' ? chapterAllowance : null,
+  };
   try {
-    await API.patch(`/api/admin/products/${id}`, { priceCents: Number(document.getElementById(`price-${id}`).value), active: document.getElementById(`active-${id}`).checked });
-    toast('Product updated');
+    if (productId) {
+      await API.patch(`/api/admin/products/${productId}`, payload);
+    } else {
+      await API.post('/api/admin/products', { ...payload, type });
+    }
+    toast('Product saved');
+    closeModal();
+    renderSettings();
   } catch (e) { toast(e.message); }
 }
 async function addGenre(){

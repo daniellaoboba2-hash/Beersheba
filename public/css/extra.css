@@ -12,11 +12,17 @@
 .auth-sub{text-align:center; color:var(--text-faint); font-size:13px; margin-bottom:26px;}
 .field{margin-bottom:16px;}
 .field label{display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:6px; font-weight:600;}
-.field input, .field select, .field textarea{width:100%; background:var(--bg-3); border:1px solid var(--border-soft); border-radius:9px; padding:12px 14px; color:var(--text); font-size:14px; font-family:inherit;}
+.field input, .field select, .field textarea{width:100%; background:var(--bg-3); border:1px solid var(--border-soft); border-radius:9px; padding:12px 14px; color:var(--text); font-size:16px; font-family:inherit;}
 .field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--gold);}
 .pw-wrap{position:relative;}
 .pw-eye{position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:var(--text-faint); padding:6px; display:flex; align-items:center; justify-content:center;}
 .pw-eye:hover{color:var(--gold-bright);}
+.auth-divider{display:flex; align-items:center; gap:12px; margin:20px 0; color:var(--text-faint); font-size:12px;}
+.auth-divider::before, .auth-divider::after{content:''; flex:1; height:1px; background:var(--border-soft);}
+.btn-google{width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#fff; color:#3c4043; border:1px solid var(--border-soft); border-radius:9px; padding:11px 14px; font-size:14px; font-weight:600; cursor:pointer; text-decoration:none;}
+.btn-google:hover{background:#f7f7f7;}
+.connected-account-row{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border-soft);}
+.connected-account-row .who{display:flex; align-items:center; gap:10px; font-size:13.5px;}
 
 /* ---------- library card layout fix ----------
    Bug: .lib-row .cov is 56px wide but coverHTML() also rendered a full
@@ -42,6 +48,14 @@
    container on rows that can exceed narrow viewports) ---------- */
 .detail-actions{flex-wrap:wrap;}
 .footer-links{flex-wrap:wrap; justify-content:center;}
+
+/* ---------- pricing grid: proper single-column stack on narrow mobile ----------
+   style.css only steps 4→2 columns at 860px; below that, 2 cramped columns
+   persisted all the way down to 320px. Stack to 1 column once there truly
+   isn't room for a comfortable 2-up layout. */
+@media (max-width:560px){
+  .pricing-grid{grid-template-columns:1fr !important; gap:16px;}
+}
 @media (max-width:600px){
   .tabs{overflow-x:auto; gap:20px; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
   .tabs::-webkit-scrollbar{display:none;}
@@ -149,6 +163,11 @@ button:focus-visible, .btn:focus-visible, a:focus-visible, .card:focus-visible, 
   .testimonial-row{grid-template-columns:1fr;}
   .vip-hero{padding:28px 16px;}
 }
+@media (max-width:400px){
+  .reader-nav{padding:0 14px 22px; gap:8px;}
+  .reader-nav .btn, .reader-nav .btn-ghost, .reader-nav .btn-gold{padding:7px 10px; font-size:11.5px; white-space:nowrap;}
+  .reader-nav > span.btn{padding:7px 10px; font-size:11.5px;}
+}
 
 /* ---------- shared premium homepage system ---------- */
 .brand-mark{display:inline-flex; width:27px; height:23px; color:var(--gold-bright); flex-shrink:0;}
@@ -183,6 +202,7 @@ header.top,.mobile-topbar{background:rgba(5,7,10,.82); border-color:rgba(197,214
 .hero-cover-wrap{width:276px; margin:0; z-index:2; filter:drop-shadow(24px 24px 30px rgba(0,0,0,.35));}
 .hero-cover-wrap .cover{border-radius:5px; border-color:rgba(240,198,110,.28); box-shadow:0 28px 55px -22px rgba(0,0,0,.95);}
 .featured-panel{align-self:center; margin-left:-1px; padding:34px 30px 34px 42px; min-height:300px; display:flex; flex-direction:column; justify-content:center; border-radius:0 9px 9px 0; background:linear-gradient(135deg,rgba(20,29,38,.94),rgba(10,15,21,.86)); border-left:0; border-color:rgba(240,198,110,.18); box-shadow:18px 22px 55px -28px rgba(0,0,0,.8);}
+.featured-panel.is-empty{margin-left:0; border-left:1px solid var(--border-soft); border-radius:9px;}
 .featured-panel .eyebrow{font-size:10px; margin-bottom:12px;}
 .featured-panel h3{font-size:28px; line-height:1.14;}
 .featured-panel p{font-size:13px; line-height:1.7;}
@@ -235,6 +255,7 @@ section.block{padding:48px 0 12px;}
   .hero-visual{margin-top:38px; min-height:0; flex-direction:row; align-items:stretch;}
   .hero-cover-wrap{width:47%; max-width:190px; margin:0;}
   .featured-panel{padding:20px 16px 18px 19px; min-height:0; border-radius:0 7px 7px 0;}
+  .featured-panel.is-empty{border-radius:7px;}
   .featured-panel h3{font-size:19px;}
   .featured-panel p{font-size:11px; line-height:1.5;}
   .featured-meta{display:block; font-size:10px; line-height:1.8; padding-top:9px;}
@@ -264,3 +285,4 @@ section.block{padding:48px 0 12px;}
   .hero-stats .stat b{font-size:17px;}
   .hero-stats .stat span{font-size:7px;}
 }
+

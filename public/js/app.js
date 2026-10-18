@@ -54,6 +54,18 @@ function bookCardHTML(book){
   </div>`;
 }
 function checkIcon(){return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>';}
+function vipCardHTML(book){
+  return `<div class="card" style="cursor:default;">
+    <div onclick="openReader('${book.bookId}','${book.slug}',${book.currentChapter||1})" style="cursor:pointer;">${coverHTML({...book, genres:[]},{title:false})}</div>
+    <div class="card-meta" style="flex-direction:column; align-items:stretch; gap:6px;">
+      <span class="genre" style="white-space:normal;">${book.title}</span>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-gold btn-sm" style="flex:1;" onclick="openReader('${book.bookId}','${book.slug}',${book.currentChapter||1})">Read</button>
+        ${book.canDownloadPdf ? `<button class="btn btn-ghost btn-sm" style="flex:1;" onclick="downloadPdf('${book.bookId}')">PDF</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
 function trustItem(icon,title,desc){
   const icons={
     lock:'<path d="M6 11V7a6 6 0 0 1 12 0v4"/><rect x="4" y="11" width="16" height="10" rx="2"/>',
@@ -526,12 +538,7 @@ function setPricingToggle(v){ state.pricingToggle=v; renderPricing(); }
 
 function renderOneTimeAccess(){
   const app = document.getElementById('app');
-  const tiers = state.products.filter(p=>p.type!=='LIFETIME_VIP');
-  const featMap = {
-    CHAPTER_ACCESS_20:['Choose 1 eligible story','Read online','Track progress','Store in library'],
-    CHAPTER_ACCESS_30:['Choose 1 eligible story','Read online','Track progress','Store in library'],
-    CHAPTER_ACCESS_50:['Choose 1 eligible story','Read online','Track progress','Store in library'],
-  };
+  const tiers = state.products.filter(p=>p.type==='READING_PASS');
   app.innerHTML = `
   <div class="wrap" style="text-align:center; padding-bottom:60px;">
     <div class="page-head" style="text-align:center"><h1>Choose Your Access</h1><p>Unlock stories. Build your library.</p></div>
@@ -539,14 +546,20 @@ function renderOneTimeAccess(){
       <button class="active" onclick="setPricingToggle('onetime')">One-time Access</button>
       <button onclick="setPricingToggle('vip')">Lifetime VIP</button>
     </div>
-    <div class="pricing-grid" style="text-align:left; grid-template-columns:repeat(${tiers.length},1fr);">
+    <div class="pricing-grid" style="text-align:left;">
       ${tiers.map(p=>`<div class="price-card">
+        ${p.badge?`<div class="badge badge-vip" style="margin-bottom:8px;">${p.badge}</div>`:''}
         <h3>${p.name}</h3>
-        <div class="price">$${(p.price_cents/100).toFixed(0)}</div>
+        <div class="price">$${(p.price_cents/100).toFixed(2).replace(/\.00$/,'')}</div>
         <div class="price-note">One-time payment</div>
-        <ul>${(featMap[p.type]||[]).map(f=>`<li>${checkIcon()}<span>${f}</span></li>`).join('')}</ul>
+        <ul>
+          <li>${checkIcon()}<span>Choose 1 eligible story${p.chapter_allowance?` (${p.chapter_allowance} chapters)`:''}</span></li>
+          <li>${checkIcon()}<span>Read online</span></li>
+          <li>${checkIcon()}<span>Track progress</span></li>
+          <li>${checkIcon()}<span>Store in library</span></li>
+        </ul>
         <button class="btn btn-ghost" style="width:100%" onclick="startPurchase('${p.id}')">Choose ${p.name.replace(' Access','')}</button>
-      </div>`).join('')}
+      </div>`).join('') || '<p class="small-muted">No access products are available right now.</p>'}
     </div>
     <div class="trust-bar" style="margin-top:40px; border-radius:14px;">
       <div class="trust-grid" style="grid-template-columns:repeat(4,1fr)">
@@ -564,7 +577,8 @@ function renderOneTimeAccess(){
 async function renderVipSalesPage(){
   const app = document.getElementById('app');
   app.innerHTML = `<div class="wrap" style="padding:80px 0; text-align:center; color:var(--text-faint);">Loading…</div>`;
-  const vipProduct = state.products.find(p=>p.type==='LIFETIME_VIP');
+  const vipProduct = state.products.find(p=>p.type==='VIP_MEMBERSHIP');
+  const alreadyVip = !!(state.session && state.session.user && (await API.get('/api/me').catch(()=>({vip:false}))).vip);
   const [bestSellers, mostRead, newReleases, exclusives] = await Promise.all([
     API.get('/api/books?bestSeller=1'),
     API.get('/api/books?trending=1'),
@@ -580,13 +594,16 @@ async function renderVipSalesPage(){
     </div>
     <div class="vip-hero">
       <p class="eyebrow">👑 Lifetime VIP</p>
-      <h2>Read Everything. Forever.</h2>
+      <h2>${alreadyVip ? "You're a Lifetime VIP Member" : 'Read Everything. Forever.'}</h2>
+      ${alreadyVip ? `<p class="small-muted" style="margin:10px 0 20px;">Thank you for being VIP — enjoy the eligible library, exclusives, and PDF downloads.</p>` : `
       <div class="price">$${vipProduct?(vipProduct.price_cents/100).toFixed(0):'30'}</div>
       <p class="small-muted">One-time payment · lifetime access</p>
       <div class="vip-benefits">
         ${[['Access eligible library','book'],['Download eligible PDFs','lock'],['New releases included','crown'],['VIP-only exclusive stories','shield'],['No ads','globe']].map(([t])=>`<div class="b">${checkIcon()}<span>${t}</span></div>`).join('')}
-      </div>
-      <button class="btn btn-gold" style="padding:14px 40px;" onclick="startPurchase('${vipProduct?vipProduct.id:''}')">Become a Lifetime VIP — $${vipProduct?(vipProduct.price_cents/100).toFixed(0):'30'}</button>
+      </div>`}
+      ${alreadyVip
+        ? `<button class="btn btn-gold" style="padding:14px 40px;" onclick="state.libTab='vip'; go('library')">View VIP Collection</button>`
+        : `<button class="btn btn-gold" style="padding:14px 40px;" onclick="startPurchase('${vipProduct?vipProduct.id:''}')">Become a Lifetime VIP — $${vipProduct?(vipProduct.price_cents/100).toFixed(0):'30'}</button>`}
     </div>
 
     <div class="vip-section"><h3>VIP Exclusive Stories</h3><div class="rail">${exclusives.map(bookCardHTML).join('') || '<p class="small-muted">More exclusives coming soon.</p>'}</div></div>
@@ -602,7 +619,9 @@ async function renderVipSalesPage(){
       </div>
     </div>
     <div style="text-align:center; margin-top:30px;">
-      <button class="btn btn-gold" style="padding:14px 40px;" onclick="startPurchase('${vipProduct?vipProduct.id:''}')">Become a Lifetime VIP — $${vipProduct?(vipProduct.price_cents/100).toFixed(0):'30'}</button>
+      ${alreadyVip
+        ? `<button class="btn btn-gold" style="padding:14px 40px;" onclick="state.libTab='vip'; go('library')">View VIP Collection</button>`
+        : `<button class="btn btn-gold" style="padding:14px 40px;" onclick="startPurchase('${vipProduct?vipProduct.id:''}')">Become a Lifetime VIP — $${vipProduct?(vipProduct.price_cents/100).toFixed(0):'30'}</button>`}
     </div>
   </div>
   ${footerHTML()}`;
@@ -648,7 +667,7 @@ async function completePurchase(orderId, productType, dev){
       return;
     }
     await loadSession();
-    if (productType === 'LIFETIME_VIP') {
+    if (productType === 'VIP_MEMBERSHIP') {
       document.getElementById('purchaseModal').outerHTML = purchaseModalShell(`
         <div class="pay-success"><div class="check">✓</div><h3>Welcome to VIP</h3><p class="modal-sub">Your lifetime membership is active. Enjoy the eligible library, exclusives, and PDF downloads.</p>
         <button class="btn btn-gold btn-block" onclick="closePurchaseModal(); state.libTab='vip'; go('library')">Go to VIP Collection</button></div>`);
@@ -714,7 +733,12 @@ function renderLibBody(){
   } else if (state.libTab === 'purchased') {
     body.innerHTML = lib.purchased.length ? `<div class="lib-grid">${lib.purchased.map(bookCardHTML).join('')}</div>` : emptyShelf();
   } else if (state.libTab === 'vip') {
-    body.innerHTML = lib.vipCollection.length ? `<div class="lib-grid">${lib.vipCollection.map(bookCardHTML).join('')}</div>` : emptyShelf();
+    body.innerHTML = lib.vipCollection.length
+      ? `<div class="vip-benefits" style="justify-content:flex-start; margin-bottom:20px;">
+          ${['Read VIP stories','Access eligible library','Download PDFs','New releases','VIP-only stories'].map(t=>`<div class="b">${checkIcon()}<span>${t}</span></div>`).join('')}
+        </div>
+        <div class="lib-grid">${lib.vipCollection.map(vipCardHTML).join('')}</div>`
+      : emptyShelf();
   } else {
     body.innerHTML = lib.completed.length ? `<div class="lib-list">${lib.completed.map(b=>`
       <div class="lib-row">
@@ -763,11 +787,16 @@ async function renderReader(){
       ${chapter.content.split(/\n+/).filter(Boolean).map(p=>`<p>${p}</p>`).join('')}
     </div>
     <div class="reader-nav">
-      <button class="btn btn-ghost btn-sm" onclick="changeChapter(-1)">‹ Previous</button>
+      ${chapter.number <= 1
+        ? `<span style="width:84px;"></span>`
+        : `<button class="btn btn-ghost btn-sm" onclick="changeChapter(-1)">‹ Previous</button>`}
       <div style="display:flex; align-items:center; gap:10px; flex:1;">
         <div class="reader-progress-mini"><i style="width:${pct}%"></i></div>
         <span style="font-size:12px; color:var(--text-faint); width:36px;">${pct}%</span>
       </div>
+      ${chapter.number >= chapter.totalChapters
+        ? `<span class="btn btn-ghost btn-sm" style="opacity:.7; cursor:default;">Book Completed ✓</span>`
+        : `<button class="btn btn-gold btn-sm" onclick="changeChapter(1)">Next Chapter ›</button>`}
     </div>
     <div class="reader-toolbar">
       ${toolbarBtn('text','Text', 'cycleFont()')}
@@ -788,15 +817,6 @@ async function renderReader(){
         <button class="btn btn-gold btn-sm" onclick="postChapterComment()">Post</button>
       </div>
       <div id="cdList"><p class="small-muted">Loading discussion…</p></div>
-    </div>
-
-    <div class="reader-nav" style="margin-top:8px;">
-      <button class="btn btn-ghost btn-sm" onclick="changeChapter(-1)">‹ Previous</button>
-      <div style="display:flex; align-items:center; gap:10px; flex:1;">
-        <div class="reader-progress-mini"><i style="width:${pct}%"></i></div>
-        <span style="font-size:12px; color:var(--text-faint); width:36px;">${pct}%</span>
-      </div>
-      <button class="btn btn-gold btn-sm" onclick="changeChapter(1)">Next Chapter ›</button>
     </div>
   </div>`;
   saveProgress(chapter);
@@ -965,7 +985,7 @@ function renderProfileTab(body, me){
         ${me.vip
           ? `<h3 class="serif" style="font-size:20px; margin:10px 0 4px;">👑 Lifetime VIP Member</h3><p style="font-size:12.5px; color:var(--text-faint); margin-bottom:16px;">Thank you for being a VIP.</p>`
           : `<h3 class="serif" style="font-size:20px; margin:10px 0 4px;">Standard Reader</h3><p style="font-size:12.5px; color:var(--text-faint); margin-bottom:16px;">Upgrade for unlimited access to the eligible library.</p>`}
-        <button class="btn btn-gold btn-sm" style="width:100%" onclick="go('pricing')">${me.vip?'View VIP Benefits':'Become VIP'}</button>
+        <button class="btn btn-gold btn-sm" style="width:100%" onclick="${me.vip?"state.libTab='vip'; go('library')":"go('pricing')"}">${me.vip?'View VIP Collection':'Become VIP'}</button>
       </div>
     </div>`;
   document.getElementById('fBio').addEventListener('input', (e)=>{ document.getElementById('bioCount').textContent = e.target.value.length; });
@@ -1106,11 +1126,30 @@ function renderSecurityTab(body, me){
   body.innerHTML = `
     <div class="profile-card" style="max-width:520px;">
       <h3 class="serif" style="font-size:18px; margin-bottom:18px;">Account &amp; Security</h3>
+      ${me.user.hasPassword ? `
       <div class="field"><label>Current Password</label><input type="password" id="curPass"></div>
       <div class="field"><label>New Password</label><input type="password" id="newPass" minlength="8"></div>
       <div id="passStatus" class="inline-error" style="display:none;"></div>
       <button class="btn btn-gold" onclick="changePassword()">Change Password</button>
       <p class="small-muted" style="margin-top:10px;">Changing your password signs you out on all other devices.</p>
+      ` : `
+      <p class="small-muted" style="margin-bottom:10px;">You signed up with Google and don't have a password yet. Set one so you can also sign in without Google.</p>
+      <div class="field"><label>New Password</label><input type="password" id="newPass" minlength="8"></div>
+      <div id="passStatus" class="inline-error" style="display:none;"></div>
+      <button class="btn btn-gold" onclick="changePassword()">Set Password</button>
+      `}
+
+      <hr style="border-color:var(--border-soft); margin:26px 0;">
+      <h3 class="serif" style="font-size:16px; margin-bottom:10px;">Connected Accounts</h3>
+      <div class="connected-account-row">
+        <div class="who">
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.7-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.6 3 24 3 16.3 3 9.7 7.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.5 0 10.4-1.9 14.3-5.1l-6.6-5.6C29.6 36.1 26.9 37 24 37c-5.2 0-9.6-3.3-11.3-8l-6.6 5.1C9.6 40.6 16.3 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.6C41.8 36 45 30.5 45 24c0-1.4-.1-2.7-.4-3.5z"/></svg>
+          <span>Google ${me.googleConnected ? `— <b>${me.googleEmail || 'connected'}</b>` : '— not connected'}</span>
+        </div>
+        ${me.googleConnected
+          ? `<button class="btn btn-ghost btn-sm" onclick="disconnectGoogle()">Disconnect</button>`
+          : `<a class="btn btn-ghost btn-sm" href="/api/auth/google/start?mode=LINK">Connect</a>`}
+      </div>
 
       <hr style="border-color:var(--border-soft); margin:26px 0;">
       <button class="btn btn-ghost btn-block" onclick="logout()">Sign Out</button>
@@ -1120,19 +1159,31 @@ function renderSecurityTab(body, me){
       <p class="small-muted" style="margin-bottom:12px;">Not available in this prototype. Your library, reading progress, comments, reviews, purchase records, and VIP entitlement would need a deliberate retention policy (financial and audit records are never deleted just because an account closes) before this can go live.</p>
       <button class="btn btn-ghost" disabled onclick="explainDeleteAccount()">Delete Account (disabled)</button>
     </div>`;
-  wirePasswordToggle('curPass');
+  if (me.user.hasPassword) wirePasswordToggle('curPass');
   wirePasswordToggle('newPass');
+}
+async function disconnectGoogle(){
+  if (!confirm('Disconnect Google from your account?')) return;
+  try {
+    await API.post('/api/me/google/disconnect');
+    toast('Google disconnected');
+    renderProfile();
+  } catch (e) { toast(e.message); }
 }
 async function changePassword(){
   const statusEl = document.getElementById('passStatus');
   statusEl.classList.remove('show');
+  const curPassEl = document.getElementById('curPass');
   try {
     await API.post('/api/me/password', {
-      currentPassword: document.getElementById('curPass').value,
+      currentPassword: curPassEl ? curPassEl.value : undefined,
       newPassword: document.getElementById('newPass').value,
     });
-    toast('Password changed');
-    document.getElementById('curPass').value=''; document.getElementById('newPass').value='';
+    toast(curPassEl ? 'Password changed' : 'Password set');
+    if (curPassEl) curPassEl.value='';
+    document.getElementById('newPass').value='';
+    await loadSession();
+    renderProfile();
   } catch (e) { statusEl.textContent = e.message; statusEl.classList.add('show'); }
 }
 async function explainDeleteAccount(){
@@ -1203,6 +1254,16 @@ async function render(){
     state.view = v || 'home';
     if (v === 'detail' && param) state.currentSlug = param;
     if (v === 'reader' && param) { state.readerBookSlug = param; }
+  }
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('googleLinked')) {
+    state.view = 'profile';
+    state.accountTab = 'security';
+    setTimeout(() => toast('Google account connected'), 300);
+  } else if (qp.get('googleError') === 'already_linked_elsewhere') {
+    state.view = 'profile';
+    state.accountTab = 'security';
+    setTimeout(() => toast('That Google account is already connected to a different Beersheba account.'), 300);
   }
   render();
 })();
